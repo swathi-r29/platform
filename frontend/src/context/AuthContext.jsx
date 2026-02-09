@@ -1,25 +1,40 @@
 import { createContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../api/axios';
+import io from 'socket.io-client';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [socket, setSocket] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       try {
-        setUser(JSON.parse(storedUser));
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        // Initialize socket connection
+        const newSocket = io('http://localhost:5000');
+        newSocket.on('connect', () => {
+          newSocket.emit('join', userData._id);
+        });
+        setSocket(newSocket);
       } catch (error) {
         console.error('Error parsing stored user:', error);
         localStorage.removeItem('user');
       }
     }
     setLoading(false);
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
   }, []);
 
   const login = async (email, password, role) => {
@@ -65,7 +80,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, loading, socket }}>
       {children}
     </AuthContext.Provider>
   );

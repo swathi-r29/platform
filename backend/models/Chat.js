@@ -33,7 +33,7 @@ const chatSchema = new mongoose.Schema({
   booking: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Booking',
-    required: true
+    required: false
   },
   participants: [{
     type: mongoose.Schema.Types.ObjectId,

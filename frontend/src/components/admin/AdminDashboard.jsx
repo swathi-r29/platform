@@ -324,7 +324,7 @@ const AdminDashboard = () => {
                   </svg>
                 </div>
               </div>
-              <p className="text-3xl font-bold text-gray-800 mb-1">₹{analytics?.totalRevenue?.toLocaleString() || '128,450'}</p>
+              <p className="text-3xl font-bold text-gray-800 mb-1">₹{analytics?.totalRevenue !== undefined ? analytics.totalRevenue.toLocaleString() : '128,450'}</p>
               <p className="text-sm text-green-600 font-medium">+12% vs last month</p>
             </div>
 

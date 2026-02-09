@@ -46,12 +46,20 @@ const getAnalytics = async (req, res) => {
     const completedBookings = await Booking.countDocuments({ status: 'completed' });
     const pendingBookings = await Booking.countDocuments({ status: 'pending' });
 
+    // Calculate total revenue from completed bookings
+    const revenueResult = await Booking.aggregate([
+      { $match: { status: 'completed' } },
+      { $group: { _id: null, total: { $sum: '$totalAmount' } } }
+    ]);
+    const totalRevenue = revenueResult[0]?.total || 0;
+
     res.json({
       totalUsers,
       totalWorkers,
       totalBookings,
       completedBookings,
-      pendingBookings
+      pendingBookings,
+      totalRevenue
     });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -68,6 +76,68 @@ const getRecentBookings = async (req, res) => {
       .sort('-createdAt')
       .limit(10);
     res.json(recentBookings);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Update user
+const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Prevent updating admin role or other sensitive fields
+    const allowedUpdates = ['name', 'email', 'phone', 'location', 'skills', 'isAvailable', 'profileImage'];
+    const filteredUpdates = {};
+
+    Object.keys(updates).forEach(key => {
+      if (allowedUpdates.includes(key)) {
+        filteredUpdates[key] = updates[key];
+      }
+    });
+
+    const updatedUser = await User.findByIdAndUpdate(id, filteredUpdates, { new: true }).select('-password');
+    res.json({ message: 'User updated successfully', user: updatedUser });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Send message to user
+const sendMessageToUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { message } = req.body;
+
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Create a notification for the user
+    const Notification = require('../models/Notification');
+    const notification = new Notification({
+      user: id,
+      title: 'Message from Admin',
+      message: message,
+      type: 'admin_message'
+    });
+
+    await notification.save();
+
+    // Emit notification via socket if available
+    const io = req.app.get('io');
+    if (io) {
+      io.to(id).emit('notification', notification);
+    }
+
+    res.json({ message: 'Message sent successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
@@ -139,6 +209,8 @@ module.exports = {
   getAllBookings,
   getAnalytics,
   getRecentBookings,
+  updateUser,
+  sendMessageToUser,
   deleteUser,
   getSettings,
   updateSettings

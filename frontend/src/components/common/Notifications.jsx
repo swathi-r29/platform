@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from '../../api/axios';
+import { AuthContext } from '../../context/AuthContext';
 
-const Notifications = () => {
+const Notifications = ({ socket }) => {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [notifications, setNotifications] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -12,8 +16,22 @@ const Notifications = () => {
     const interval = setInterval(() => {
       fetchUnreadCount();
     }, 30000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // Listen for real-time notifications
+    if (socket) {
+      socket.on('notification', (newNotification) => {
+        setNotifications(prev => [newNotification, ...prev]);
+        setUnreadCount(prev => prev + 1);
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (socket) {
+        socket.off('notification');
+      }
+    };
+  }, [socket]);
 
   const fetchNotifications = async () => {
     try {
@@ -63,6 +81,17 @@ const Notifications = () => {
     }
   };
 
+  const chatWithAdmin = async () => {
+    try {
+      // Find admin user
+      const { data: adminUser } = await axios.get('/admin/info');
+      navigate(`/chat/${adminUser._id}`);
+      setShowDropdown(false); // Close dropdown after navigation
+    } catch (error) {
+      console.error('Error finding admin:', error);
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -94,6 +123,19 @@ const Notifications = () => {
           </div>
 
           <div className="max-h-96 overflow-y-auto">
+            {user?.role === 'worker' && (
+              <div className="p-4 border-b bg-blue-50">
+                <button
+                  onClick={chatWithAdmin}
+                  className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  Chat with Admin
+                </button>
+              </div>
+            )}
             {notifications.length === 0 ? (
               <div className="p-4 text-center text-gray-500">No notifications</div>
             ) : (

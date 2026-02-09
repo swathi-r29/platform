@@ -1,5 +1,6 @@
 const Chat = require('../models/Chat');
 const Booking = require('../models/Booking');
+const User = require('../models/User');
 
 const getChatByBooking = async (req, res) => {
   try {
@@ -122,9 +123,102 @@ const getUserChats = async (req, res) => {
   }
 };
 
+const getChatByUsers = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user._id;
+
+    // Find admin user
+    const adminUser = await User.findOne({ role: 'admin' });
+    if (!adminUser) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    // Only allow workers to chat with admin
+    if (req.user.role !== 'worker' || userId !== adminUser._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    let chat = await Chat.findOne({
+      participants: { $all: [currentUserId, userId] },
+      booking: { $exists: false }
+    })
+      .populate('participants', 'name profileImage')
+      .populate('messages.sender', 'name profileImage');
+
+    if (!chat) {
+      chat = await Chat.create({
+        participants: [currentUserId, userId],
+        messages: []
+      });
+      chat = await Chat.findById(chat._id)
+        .populate('participants', 'name profileImage')
+        .populate('messages.sender', 'name profileImage');
+    }
+
+    res.json(chat);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const sendMessageToUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { content, type, imageUrl, location } = req.body;
+    const currentUserId = req.user._id;
+
+    // Find admin user
+    const adminUser = await User.findOne({ role: 'admin' });
+    if (!adminUser) {
+      return res.status(404).json({ message: 'Admin not found' });
+    }
+
+    // Only allow workers to chat with admin
+    if (req.user.role !== 'worker' || userId !== adminUser._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    let chat = await Chat.findOne({
+      participants: { $all: [currentUserId, userId] },
+      booking: { $exists: false }
+    });
+
+    const message = {
+      sender: req.user._id,
+      content,
+      type: type || 'text',
+      imageUrl,
+      location,
+      isRead: false
+    };
+
+    chat.messages.push(message);
+    chat.lastMessage = content;
+    chat.lastMessageTime = new Date();
+    await chat.save();
+
+    chat = await Chat.findById(chat._id)
+      .populate('participants', 'name profileImage')
+      .populate('messages.sender', 'name profileImage');
+
+    const io = req.app.get('io');
+    io.to(userId).emit('newMessage', {
+      chatId: chat._id,
+      message: chat.messages[chat.messages.length - 1]
+    });
+
+    res.json(chat);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getChatByBooking,
   sendMessage,
   markMessagesAsRead,
-  getUserChats
+  getUserChats,
+  getChatByUsers,
+  sendMessageToUser
 };

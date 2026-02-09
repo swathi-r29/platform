@@ -5,7 +5,7 @@ import axios from '../../api/axios';
 import { AuthContext } from '../../context/AuthContext';
 
 const Chat = () => {
-  const { bookingId } = useParams();
+  const { bookingId, userId } = useParams();
   const { user } = useContext(AuthContext);
   const [chat, setChat] = useState(null);
   const [message, setMessage] = useState('');
@@ -14,11 +14,15 @@ const Chat = () => {
 
   useEffect(() => {
     fetchChat();
-    
+
     const newSocket = io('http://localhost:5000');
     setSocket(newSocket);
 
-    newSocket.emit('joinBooking', bookingId);
+    if (bookingId) {
+      newSocket.emit('joinBooking', bookingId);
+    } else if (userId) {
+      newSocket.emit('joinUserChat', userId);
+    }
 
     newSocket.on('newMessage', (data) => {
       if (data.chatId === chat?._id) {
@@ -30,7 +34,7 @@ const Chat = () => {
     });
 
     return () => newSocket.close();
-  }, [bookingId]);
+  }, [bookingId, userId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -38,7 +42,13 @@ const Chat = () => {
 
   const fetchChat = async () => {
     try {
-      const { data } = await axios.get(`/chat/booking/${bookingId}`);
+      let url;
+      if (bookingId) {
+        url = `/chat/booking/${bookingId}`;
+      } else if (userId) {
+        url = `/chat/user/${userId}`;
+      }
+      const { data } = await axios.get(url);
       setChat(data);
     } catch (error) {
       console.error(error);
@@ -50,7 +60,13 @@ const Chat = () => {
     if (!message.trim()) return;
 
     try {
-      await axios.post(`/chat/booking/${bookingId}/message`, {
+      let url;
+      if (bookingId) {
+        url = `/chat/booking/${bookingId}/message`;
+      } else if (userId) {
+        url = `/chat/user/${userId}/message`;
+      }
+      await axios.post(url, {
         content: message,
         type: 'text'
       });
@@ -70,7 +86,9 @@ const Chat = () => {
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         <div className="bg-blue-600 text-white p-4">
-          <h2 className="text-xl font-bold">Chat - Booking #{bookingId.slice(-8)}</h2>
+          <h2 className="text-xl font-bold">
+            {bookingId ? `Chat - Booking #${bookingId.slice(-8)}` : 'Chat with Admin'}
+          </h2>
           <p className="text-sm opacity-90">
             {chat.participants.find(p => p._id !== user._id)?.name}
           </p>

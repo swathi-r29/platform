@@ -3,9 +3,10 @@ import { Link, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import axios from '../../api/axios';
 import EarningsTracker from './EarningsTracker';
+import Notifications from '../common/Notifications';
 
 const WorkerDashboard = () => {
-  const { logout } = useContext(AuthContext);
+  const { logout, socket } = useContext(AuthContext);
   const navigate = useNavigate();
   const [bookings, setBookings] = useState([]);
   const [earnings, setEarnings] = useState(null);
@@ -205,13 +206,7 @@ const WorkerDashboard = () => {
               </p>
             </div>
             <div className="header-actions">
-              <button className="icon-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {pendingBookings.length > 0 && <span className="notification-dot"></span>}
-              </button>
+              <Notifications socket={socket} />
               <Link to="/worker/schedule" className="manage-schedule-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>

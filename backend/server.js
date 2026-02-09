@@ -29,6 +29,13 @@ const io = socketIO(server, {
   }
 });
 
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  socket.on('join', (userId) => {
+    socket.join(userId);
+  });
+});
+
 // Make io accessible to routes
 app.set('io', io);
 
@@ -111,7 +118,7 @@ app.use((err, req, res, next) => {
 });
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 80;
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
